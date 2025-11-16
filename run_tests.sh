@@ -3,11 +3,11 @@
 # Script de execução e benchmark para K-means 1D
 # Etapas 0 e 1: Serial e OpenMP
 
-echo "============================================"
+echo "============================================="
 echo "K-means 1D - Benchmark Completo"
 echo "Etapa 0: Versão Serial (Baseline)"
 echo "Etapa 1: Versão OpenMP (Paralelizada)"
-echo "============================================"
+echo "============================================="
 
 # Criar diretórios para resultados
 mkdir -p results/serial
@@ -48,21 +48,19 @@ run_serial() {
     ./bin/kmeans_1d_serial "$dataset" "$centroids" $MAX_ITER $EPS \
         "results/serial/${output_prefix}_assign.csv" \
         "results/serial/${output_prefix}_centroids.csv" \
-        > "results/serial/${output_prefix}_output.txt" 2>&1
+        > "results/serial/${output_prefix}_output.txt"
+        
+    if [ $? -ne 0 ]; then
+        echo "ERRO na execução serial do dataset $output_prefix"
+        exit 1
+    fi
     
-    # Extrair métricas da saída
+    # Extrair tempo e sse
     local time_ms=$(grep "Tempo:" "results/serial/${output_prefix}_output.txt" | awk '{print $2}')
-    local sse=$(grep "SSE final:" "results/serial/${output_prefix}_output.txt" | awk '{print $3}')
-    local iters=$(grep "Iterações:" "results/serial/${output_prefix}_output.txt" | awk '{print $2}')
-    
-    # Validar valores
-    if [ -z "$time_ms" ]; then time_ms="0.00"; fi
-    if [ -z "$sse" ]; then sse="0.000000"; fi
-    if [ -z "$iters" ]; then iters="0"; fi
-    
-    echo "$time_ms|$sse|$iters"
+    echo $time_ms
 }
 
+# Função para executar e extrair métricas do OpenMP
 run_openmp() {
     local dataset=$1
     local centroids=$2
@@ -73,184 +71,132 @@ run_openmp() {
     ./bin/kmeans_1d_omp "$dataset" "$centroids" $threads $MAX_ITER $EPS \
         "results/openmp/${output_prefix}_t${threads}_assign.csv" \
         "results/openmp/${output_prefix}_t${threads}_centroids.csv" \
-        > "results/openmp/${output_prefix}_t${threads}_output.txt" 2>&1
-    
-    # Extrair métricas da saída
-    local time_ms=$(grep "Tempo:" "results/openmp/${output_prefix}_t${threads}_output.txt" | awk '{print $2}')
-    local sse=$(grep "SSE final:" "results/openmp/${output_prefix}_t${threads}_output.txt" | awk '{print $3}')
-    local iters=$(grep "Iterações:" "results/openmp/${output_prefix}_t${threads}_output.txt" | awk '{print $2}')
-    
-    # Validar valores
-    if [ -z "$time_ms" ]; then time_ms="0.00"; fi
-    if [ -z "$sse" ]; then sse="0.000000"; fi
-    if [ -z "$iters" ]; then iters="0"; fi
-    
-    echo "$time_ms|$sse|$iters"
+        > "results/openmp/${output_prefix}_t${threads}_output.txt"
+
+    if [ $? -ne 0 ]; then
+        echo "ERRO na execução OpenMP (T=$threads) do dataset $output_prefix"
+        exit 1
+    fi
+
+    # Extrair tempo, sse e iters
+    local metrics=$(grep -E "Tempo:|SSE final:|Iterações:" "results/openmp/${output_prefix}_t${threads}_output.txt" | awk '{print $NF}')
+    echo $metrics
 }
 
+# Helper para extrair apenas o tempo (para média)
+extract_time_omp() {
+    grep "Tempo:" "results/openmp/${1}_output.txt" | awk '{print $2}'
+}
+
+
 # ============================================
-# ETAPA 0: VERSÃO SERIAL (BASELINE)
+# ETAPA 0: Versão Serial (Baseline)
 # ============================================
 
 echo ""
-echo "============================================"
-echo "ETAPA 0: Executando Versão Serial"
-echo "============================================"
-
-# Dataset TESTE
 echo ""
-echo "--- Dataset TESTE (validação rápida) ---"
-result=$(run_serial "data/dados_teste.csv" "data/centroides_teste.csv" "teste")
-IFS='|' read -r time_ms sse iters <<< "$result"
-echo "Tempo: $time_ms ms | SSE: $sse | Iterações: $iters"
+echo "============================================="
+echo "ETAPA 0: Executando Versão Serial (Baseline)"
+echo "============================================="
 
-# Dataset PEQUENO
-echo ""
+# Teste (validação)
+echo "--- Dataset TESTE (20 pontos, 4 clusters) ---"
+run_serial "data/dados_teste.csv" "data/centroides_teste.csv" "teste"
+
+# Pequeno
 echo "--- Dataset PEQUENO (10k pontos, 4 clusters) ---"
-result=$(run_serial "data/dados_pequeno.csv" "data/centroides_pequeno.csv" "pequeno")
-IFS='|' read -r serial_time_small sse iters <<< "$result"
-echo "Tempo SERIAL: $serial_time_small ms | SSE: $sse | Iterações: $iters"
+serial_time_small=$(run_serial "data/dados_pequeno.csv" "data/centroides_pequeno.csv" "pequeno")
+echo "Tempo Serial (Pequeno): $serial_time_small ms"
 
-# Dataset MÉDIO
-echo ""
+# Médio
 echo "--- Dataset MÉDIO (100k pontos, 8 clusters) ---"
-result=$(run_serial "data/dados_medio.csv" "data/centroides_medio.csv" "medio")
-IFS='|' read -r serial_time_medium sse iters <<< "$result"
-echo "Tempo SERIAL: $serial_time_medium ms | SSE: $sse | Iterações: $iters"
+serial_time_medium=$(run_serial "data/dados_medio.csv" "data/centroides_medio.csv" "medio")
+echo "Tempo Serial (Médio): $serial_time_medium ms"
 
-# Dataset GRANDE
-echo ""
+# Grande
 echo "--- Dataset GRANDE (1M pontos, 16 clusters) ---"
-result=$(run_serial "data/dados_grande.csv" "data/centroides_grande.csv" "grande")
-IFS='|' read -r serial_time_large sse iters <<< "$result"
-echo "Tempo SERIAL: $serial_time_large ms | SSE: $sse | Iterações: $iters"
+serial_time_large=$(run_serial "data/dados_grande.csv" "data/centroides_grande.csv" "grande")
+echo "Tempo Serial (Grande): $serial_time_large ms"
+
 
 # ============================================
-# ETAPA 1: VERSÃO OPENMP
+# ETAPA 1: Versão OpenMP
 # ============================================
 
 echo ""
 echo ""
-echo "============================================"
+echo "============================================="
 echo "ETAPA 1: Executando Versão OpenMP"
-echo "============================================"
+echo "============================================="
 
-# Array de números de threads para testar
-THREAD_COUNTS=(1 2 4 8 16)
+# Configurações de teste
+THREADS_LIST=(1 2 4 8 16)
+NUM_RUNS=3 # Número de execuções para média
+VERBOSE=false # Mudar para true para ver todas as saídas
+
+declare -A datasets
+datasets["pequeno"]="data/dados_pequeno.csv data/centroides_pequeno.csv $serial_time_small"
+datasets["medio"]="data/dados_medio.csv data/centroides_medio.csv $serial_time_medium"
+datasets["grande"]="data/dados_grande.csv data/centroides_grande.csv $serial_time_large"
 
 # Arquivo de resultados
-RESULTS_FILE="results/benchmarks/speedup_results.csv"
-echo "Dataset,Threads,Time_ms,SSE,Iters,Speedup,Efficiency" > "$RESULTS_FILE"
+RESULT_FILE="results/benchmarks/speedup_results.csv"
+echo "Dataset,Threads,Time_ms,SSE,Iters,Speedup,Efficiency" > $RESULT_FILE
 
-# ============================================
-# Benchmark: Dataset PEQUENO
-# ============================================
-
-echo ""
-echo "--- Dataset PEQUENO (10k pontos) ---"
-echo "Threads | Tempo (ms) | Speedup | Eficiência"
-echo "--------|------------|---------|------------"
-
-for threads in "${THREAD_COUNTS[@]}"; do
-    result=$(run_openmp "data/dados_pequeno.csv" "data/centroides_pequeno.csv" $threads "pequeno")
-    IFS='|' read -r time_ms sse iters <<< "$result"
+# Loop principal
+for dataset_name in "${!datasets[@]}"; do
+    read -r data_file centroid_file serial_baseline <<< "${datasets[$dataset_name]}"
     
-    # Calcular speedup e eficiência com validação
-    if [ "$time_ms" != "0.00" ] && [ "$serial_time_small" != "0.00" ]; then
-        speedup=$(echo "scale=2; $serial_time_small / $time_ms" | bc -l)
+    echo ""
+    echo "---------------------------------------------"
+    echo "Processando Dataset: $dataset_name"
+    echo "Baseline Serial: $serial_baseline ms"
+    echo "---------------------------------------------"
+    echo "Threads | Tempo (ms) | Speedup | Eficiência"
+    echo "--------|------------|---------|------------"
+
+    for threads in "${THREADS_LIST[@]}"; do
+        
+        total_time=0
+        
+        # Executar N vezes para média
+        for ((i=1; i<=$NUM_RUNS; i++)); do
+            output_prefix="${dataset_name}_run${i}"
+            
+            # Executar
+            metrics=$(run_openmp "$data_file" "$centroid_file" $threads $output_prefix)
+            
+            # Pegar métricas da primeira execução
+            if [ $i -eq 1 ]; then
+                read -r iters_omp sse_omp time_ms_omp <<< "$metrics"
+            fi
+
+            # Extrair tempo
+            time_run=$(extract_time_omp "${output_prefix}_t${threads}")
+            total_time=$(echo "$total_time + $time_run" | bc -l)
+        done
+        
+        # Calcular média
+        time_ms_avg=$(echo "scale=2; $total_time / $NUM_RUNS" | bc -l)
+        
+        # Calcular Speedup e Eficiência
+        speedup=$(echo "scale=2; $serial_baseline / $time_ms_avg" | bc -l)
         efficiency=$(echo "scale=2; ($speedup / $threads) * 100" | bc -l)
-    else
-        speedup="0.00"
-        efficiency="0.00"
-    fi
-    
-    printf "%7d | %10s | %7s | %10s%%\n" $threads $time_ms $speedup $efficiency
-    echo "pequeno,$threads,$time_ms,$sse,$iters,$speedup,$efficiency" >> "$RESULTS_FILE"
-done
+        
+        # Imprimir tabela
+        printf "%-7d | %-10.2f | %-7.2f | %-10.1f%%\n" $threads $time_ms_avg $speedup $efficiency
 
-# ============================================
-# Benchmark: Dataset MÉDIO
-# ============================================
+        # Salvar no CSV
+        echo "$dataset_name,$threads,$time_ms_avg,$sse_omp,$iters_omp,$speedup,$efficiency" >> $RESULT_FILE
+    done # Fim do loop de threads
+done # Fim do loop de datasets
 
 echo ""
-echo "--- Dataset MÉDIO (100k pontos) ---"
-echo "Threads | Tempo (ms) | Speedup | Eficiência"
-echo "--------|------------|---------|------------"
+echo "Speedup e Eficiência (OpenMP) salvos em: $RESULT_FILE"
 
-for threads in "${THREAD_COUNTS[@]}"; do
-    result=$(run_openmp "data/dados_medio.csv" "data/centroides_medio.csv" $threads "medio")
-    IFS='|' read -r time_ms sse iters <<< "$result"
-    
-    # Calcular speedup e eficiência com validação
-    if [ "$time_ms" != "0.00" ] && [ "$serial_time_medium" != "0.00" ]; then
-        speedup=$(echo "scale=2; $serial_time_medium / $time_ms" | bc -l)
-        efficiency=$(echo "scale=2; ($speedup / $threads) * 100" | bc -l)
-    else
-        speedup="0.00"
-        efficiency="0.00"
-    fi
-    
-    printf "%7d | %10s | %7s | %10s%%\n" $threads $time_ms $speedup $efficiency
-    echo "medio,$threads,$time_ms,$sse,$iters,$speedup,$efficiency" >> "$RESULTS_FILE"
-done
 
-# ============================================
-# Benchmark: Dataset GRANDE
-# ============================================
-
-echo ""
-echo "--- Dataset GRANDE (1M pontos) ---"
-echo "Threads | Tempo (ms) | Speedup | Eficiência"
-echo "--------|------------|---------|------------"
-
-for threads in "${THREAD_COUNTS[@]}"; do
-    result=$(run_openmp "data/dados_grande.csv" "data/centroides_grande.csv" $threads "grande")
-    IFS='|' read -r time_ms sse iters <<< "$result"
-    
-    # Calcular speedup e eficiência com validação
-    if [ "$time_ms" != "0.00" ] && [ "$serial_time_large" != "0.00" ]; then
-        speedup=$(echo "scale=2; $serial_time_large / $time_ms" | bc -l)
-        efficiency=$(echo "scale=2; ($speedup / $threads) * 100" | bc -l)
-    else
-        speedup="0.00"
-        efficiency="0.00"
-    fi
-    
-    printf "%7d | %10s | %7s | %10s%%\n" $threads $time_ms $speedup $efficiency
-    echo "grande,$threads,$time_ms,$sse,$iters,$speedup,$efficiency" >> "$RESULTS_FILE"
-done
-
-# ============================================
-# Verificação de Resultados
-# ============================================
-
-echo ""
-echo ""
-echo "============================================"
-echo "VERIFICAÇÃO DE RESULTADOS"
-echo "============================================"
-echo ""
-
-# Verificar se houve resultados válidos
-total_lines=$(wc -l < "$RESULTS_FILE")
-if [ "$total_lines" -le 1 ]; then
-    echo "⚠ AVISO: Nenhum resultado foi coletado!"
+if [ "$VERBOSE" == "true" ]; then
     echo ""
-    echo "Possíveis causas:"
-    echo "  1. Programas não executaram corretamente"
-    echo "  2. Formato de saída diferente do esperado"
-    echo ""
-    echo "Diagnóstico:"
-    echo "  Verifique os arquivos de saída em results/serial/ e results/openmp/"
-    echo "  Exemplo: cat results/serial/teste_output.txt"
-    echo ""
-    echo "  Se houver erros de execução, compile novamente:"
-    echo "    ./compile.sh"
-else
-    echo "✓ Resultados coletados: $((total_lines - 1)) experimentos"
-    echo ""
-    
-    # Mostrar exemplo de saída
     echo "Exemplo de saída serial (dataset teste):"
     echo "----------------------------------------"
     if [ -f "results/serial/teste_output.txt" ]; then
@@ -260,15 +206,125 @@ else
     fi
 fi
 
+# ==========================================================
+# ETAPA 2: VERSÃO CUDA (GPU)
+# ==========================================================
+
+echo ""
+echo ""
+echo "============================================="
+echo "Etapa 2: Versão CUDA (GPU)"
+echo "============================================="
+
+# Cores
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Verificar se binário CUDA existe
+if [ ! -f "./bin/kmeans_1d_cuda" ]; then
+    echo -e "   ${YELLOW}⚠ AVISO: Binário CUDA (bin/kmeans_1d_cuda) não encontrado!${NC}"
+    echo -e "   ${YELLOW}PULANDO${NC} Etapa 2 (CUDA)."
+    echo -e "   ${YELLOW}Para executar, rode ./compile.sh em uma máquina com o CUDA Toolkit.${NC}"
+else
+    echo -e "   ${GREEN}✓${NC} Binário CUDA encontrado. Iniciando benchmarks..."
+    mkdir -p results/cuda
+    mkdir -p results/benchmarks_cuda
+
+    # Usar os mesmos baselines da Etapa 0 (JÁ CALCULADOS)
+    declare -A serial_times_cuda
+    serial_times_cuda["pequeno"]=$serial_time_small
+    serial_times_cuda["medio"]=$serial_time_medium
+    serial_times_cuda["grande"]=$serial_time_large
+
+    # Arquivo de resultados CUDA
+    CUDA_RESULT_FILE="results/benchmarks_cuda/benchmark_results_cuda.csv"
+    echo "Dataset,BlockSize,Time_ms,Kernel_ms,H2D_ms,D2H_ms,Host_ms,SSE,Iters,Speedup,Throughput_ps" > $CUDA_RESULT_FILE
+
+    # Listas para iterar
+    datasets_cuda=("pequeno" "medio" "grande")
+    clusters_k_cuda=(4 8 16) # K correspondente
+    block_sizes_cuda=(128 256 512)
+
+    # Função para executar e extrair métricas CUDA
+    run_cuda() {
+        local dataset_name=$1
+        local k=$2
+        local block_size=$3
+        local serial_baseline=$4
+        
+        local data_file="data/dados_${dataset_name}.csv"
+        local centroid_file="data/centroides_${dataset_name}.csv"
+        local output_file="results/cuda/output_${dataset_name}_b${block_size}.txt"
+        local assign_file="results/cuda/${dataset_name}_b${block_size}_assign.csv"
+        
+        echo "   --- Executando CUDA: $dataset_name (K=$k) com Block Size $block_size ---"
+        
+        # Executar e salvar saída completa
+        ./bin/kmeans_1d_cuda "$data_file" "$centroid_file" $block_size $MAX_ITER $EPS \
+            "$assign_file" > "$output_file"
+            
+        if [ $? -ne 0 ]; then
+            echo -e "   ${RED}✗ ERRO na execução do CUDA. Verifique $output_file${NC}"
+            return
+        fi
+        
+        # === INÍCIO DA CORREÇÃO (AWK) ===
+        # A saída do .cu é "1. Kernel (Assignment): 10.00 ms (...)"
+        # O valor numérico é o 4º campo, não o 3º.
+        
+        local time_ms=$(grep "Tempo Total:" "$output_file" | awk '{print $3}')
+        local kernel_ms=$(grep "Kernel (Assignment):" "$output_file" | awk '{print $4}') # Corrigido de $3 para $4
+        local h2d_ms=$(grep "Transfer H2D (C):" "$output_file" | awk '{print $5}')    # Corrigido de $4 para $5
+        local d2h_ms=$(grep "Transfer D2H (assign):" "$output_file" | awk '{print $5}') # Corrigido de $4 para $5
+        local host_ms=$(grep "Update (Host):" "$output_file" | awk '{print $4}')   # Corrigido de $3 para $4
+        # === FIM DA CORREÇÃO ===
+
+        local sse=$(grep "SSE final:" "$output_file" | awk '{print $3}')
+        local iters=$(grep "Iterações:" "$output_file" | awk '{print $2}')
+        local throughput=$(grep "Throughput:" "$output_file" | awk '{print $2}')
+        
+        # Calcular speedup (usando 'bc' para float)
+        local speedup=0
+        if (( $(echo "$time_ms > 0" | bc -l) )); then
+            speedup=$(echo "scale=2; $serial_baseline / $time_ms" | bc -l)
+        fi
+        
+        echo "     Tempo: $time_ms ms | Kernel: $kernel_ms ms | SSE: $sse | Speedup: ${speedup}x"
+        
+        # Salvar no CSV
+        echo "$dataset_name,$block_size,$time_ms,$kernel_ms,$h2d_ms,$d2h_ms,$host_ms,$sse,$iters,$speedup,$throughput" >> $CUDA_RESULT_FILE
+    }
+
+    # Loop Principal de Benchmark CUDA
+    for i in ${!datasets_cuda[@]}; do
+        dataset_name=${datasets_cuda[$i]}
+        k=${clusters_k_cuda[$i]}
+        serial_baseline=${serial_times_cuda[$dataset_name]}
+        
+        echo ""
+        echo "   Processando Dataset CUDA: $dataset_name (K=$k)"
+        
+        for block_size in "${block_sizes_cuda[@]}"; do
+            run_cuda $dataset_name $k $block_size $serial_baseline
+        done
+    done
+    
+    echo ""
+    echo -e "   ${GREEN}✓${NC} Benchmarks CUDA concluídos."
+    echo "   Resultados salvos em: $CUDA_RESULT_FILE"
+fi
+
 # ============================================
 # Resumo Final
 # ============================================
 
 echo ""
 echo ""
-echo "============================================"
+echo "============================================="
 echo "RESUMO DOS RESULTADOS"
-echo "============================================"
+echo "============================================="
 echo ""
 echo "Tempos baseline (serial):"
 echo "  Teste:   Ver results/serial/teste_output.txt"
@@ -279,19 +335,32 @@ echo ""
 echo "Resultados salvos em:"
 echo "  - results/serial/       (outputs da versão serial)"
 echo "  - results/openmp/       (outputs da versão OpenMP)"
-echo "  - results/benchmarks/speedup_results.csv (dados completos)"
+echo "  - results/benchmarks/speedup_results.csv (dados completos OpenMP)"
+# Adição para o CUDA:
+if [ -f "./bin/kmeans_1d_cuda" ]; then
+    echo "  - results/cuda/           (outputs da versão CUDA)"
+    echo "  - results/benchmarks_cuda/benchmark_results_cuda.csv (dados completos CUDA)"
+fi
 echo ""
 echo "Para visualizar os dados:"
 echo "  cat results/benchmarks/speedup_results.csv"
+# Adição para o CUDA:
+if [ -f "./bin/kmeans_1d_cuda" ]; then
+    echo "  cat results/benchmarks_cuda/benchmark_results_cuda.csv"
+fi
 echo ""
 echo "Para análise detalhada:"
 echo "  cat results/serial/pequeno_output.txt"
 echo "  cat results/openmp/pequeno_t4_output.txt"
+# Adição para o CUDA:
+if [ -f "./bin/kmeans_1d_cuda" ]; then
+    echo "  cat results/cuda/output_grande_b256.txt"
+fi
 echo ""
 echo "Próximos passos:"
 echo "  1. Analisar os gráficos de speedup: ./plot_results.py"
 echo "  2. Verificar eficiência de paralelização"
-echo "  3. Comparar SSE entre versões (devem ser iguais)"
-echo "  4. Identificar o melhor número de threads"
-echo ""
-echo "============================================"
+# Adição para o CUDA:
+if [ -f "./bin/kmeans_1d_cuda" ]; then
+    echo "  3. Analisar gargalos de CUDA (Kernel vs. Transferência)"
+fi

@@ -11,7 +11,7 @@ Resultados:
   Iterações: 4
   SSE final: 344.875000
   Tempo: 0.00 ms
-  Throughput: 4761.90 pontos/ms
+  Throughput: 6531.68 pontos/ms
 
 SSE por iteração:
   [  0] SSE = 2279.000000

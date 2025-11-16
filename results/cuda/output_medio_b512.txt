@@ -1,0 +1,33 @@
+========================================
+K-means 1D - Versão CUDA (GPU)
+========================================
+Parâmetros:
+  N = 100000 pontos
+  K = 8 clusters
+  Block Size = 512
+  max_iter = 100
+  eps = 1e-06
+
+Resultados:
+  Iterações: 3
+  SSE final: 827601.424480
+
+--- Tempos de Execução (ms) ---
+  Tempo Total: 8.16 ms
+  Throughput: 36768741.67 pontos/s
+
+--- Detalhamento dos Tempos (ms) ---
+  1. Kernel (Assignment): 4.80 ms (58.8%)
+  2. Update (Host):       1.03 ms (12.6%)
+  3. Transfer H2D (C):    0.13 ms (1.6%)
+  4. Transfer D2H (assign): 0.66 ms (8.1%)
+  --------------------------------------
+  Total Computação (Kernel + Host): 5.82 ms (71.4%)
+  Total Comunicação (H2D + D2H):  0.80 ms (9.8%)
+
+SSE por iteração (10 primeiras):
+  [  0] SSE = 3870380.000000
+  [  1] SSE = 827601.424480 (Δ = -3042778.575520)
+  [  2] SSE = 827601.424480 (Δ = 0.000000)
+
+Assignments salvos em: results/cuda/medio_b512_assign.csv

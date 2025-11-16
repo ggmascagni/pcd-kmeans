@@ -1,0 +1,23 @@
+========================================
+K-means 1D - Versão OPENMP
+========================================
+Parâmetros:
+  N = 100000 pontos
+  K = 8 clusters
+  Threads = 16
+  max_iter = 100
+  eps = 1e-06
+
+Resultados:
+  Iterações: 3
+  SSE final: 827601.424480
+  Tempo: 115.84 ms
+  Throughput: 863.29 pontos/ms
+
+SSE por iteração:
+  [  0] SSE = 3870380.000000
+  [  1] SSE = 827601.424480 (Δ = -3042778.575520)
+  [  2] SSE = 827601.424480 (Δ = 0.000000)
+
+Assignments salvos em: results/openmp/medio_run2_t16_assign.csv
+Centróides salvos em: results/openmp/medio_run2_t16_centroids.csv

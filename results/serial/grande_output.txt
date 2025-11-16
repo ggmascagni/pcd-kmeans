@@ -10,8 +10,8 @@ Parâmetros:
 Resultados:
   Iterações: 3
   SSE final: 8249412.958850
-  Tempo: 34.75 ms
-  Throughput: 28776.73 pontos/ms
+  Tempo: 72.84 ms
+  Throughput: 13728.68 pontos/ms
 
 SSE por iteração:
   [  0] SSE = 38551277.000000
