@@ -1,0 +1,52 @@
+K-Means 1D - Implementação MPI
+
+Esta pasta contém a implementação do algoritmo K-Means 1D utilizando MPI (Message Passing Interface) para paralelismo em memória distribuída.
+
+Estrutura dos Arquivos
+
+kmeans_1d_mpi.c: Código fonte principal.
+
+Makefile: Script de compilação.
+
+`testes.py`: Script Python para automação de testes e geração de gráficos de speedup.
+
+Como Compilar
+
+Certifique-se de ter um compilador MPI instalado (ex: mpich ou openmpi).
+
+make
+
+
+Como Executar
+
+A execução padrão utiliza o mpirun (ou mpiexec). É necessário fornecer os arquivos de entrada (pontos e centróides iniciais).
+
+mpirun -np <NUM_PROCESSOS> ./kmeans_1d_mpi <DADOS> <CENTROIDES> [MAX_ITER] [EPS] [OUT_ASSIGN] [OUT_CENTROIDS]
+
+
+Exemplo:
+
+mpirun -np 4 ./kmeans_1d_mpi ../dados.csv ../centroides_iniciais.csv 100 0.000001
+
+
+Estratégia de Paralelização
+
+A estratégia adotada segue o modelo SPMD (Single Program, Multiple Data) com decomposição de domínio:
+
+Distribuição de Dados: O processo Rank 0 lê os dados e utiliza MPI_Scatterv para distribuir fatias do vetor $X$ entre todos os processos.
+
+Sincronização de Centróides: A cada iteração, os centróides $C$ são atualizados globalmente.
+
+Cálculo Local: Cada processo calcula a distância euclidiana apenas para seus pontos locais.
+
+Redução Global:
+
+MPI_Allreduce é utilizado para somar as coordenadas e contadores de clusters de todos os processos.
+
+MPI_Reduce é utilizado para calcular o SSE global (usado no critério de convergência).
+
+Atualização: Todos os processos possuem os dados agregados necessários para atualizar o vetor $C$ localmente antes da próxima iteração.
+
+Análise de Desempenho
+
+O código instrumenta o tempo gasto especificamente na comunicação global (MPI_Allreduce) para análise de gargalos de escalabilidade. Execute o script `testes.py` para gerar curvas de Strong Scaling.
